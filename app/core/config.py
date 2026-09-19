@@ -30,6 +30,7 @@ class Settings:
     clients_json: str = field(default_factory=lambda: os.getenv("AI_HUB_CLIENTS_JSON", "[]"))
     products_json: str = field(default_factory=lambda: os.getenv("AI_HUB_PRODUCTS_JSON", "[]"))
     entitlements_json: str = field(default_factory=lambda: os.getenv("AI_HUB_ENTITLEMENTS_JSON", "[]"))
+    cors_origins_json: str = field(default_factory=lambda: os.getenv("AI_HUB_CORS_ORIGINS_JSON", '["null"]'))
 
 def get_settings() -> Settings:
     return Settings()

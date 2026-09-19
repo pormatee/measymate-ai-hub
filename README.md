@@ -84,3 +84,11 @@ Restart the Hub after changing `.env`.
 ## Contract
 
 AI assists Core Coach with understanding language, context, information type, coherence, and candidate next questions. AI does **not** decide Root Cause, pass Root Cause gates, choose corrective action, or close the case. Those remain under Core Coach + user control.
+
+## Phase 4 — Coach Browser Bridge
+
+- `POST /v1/coach/understand` accepts bounded Coach context, not arbitrary chat messages.
+- The Hub injects a locked Coach Understanding system prompt server-side.
+- Provider output is normalized to an **UNTRUSTED proposal** and forbidden decision fields are discarded.
+- `AI_HUB_CORS_ORIGINS_JSON` controls browser origins. For local Android HTML use `["null"]`; production should list only exact HTTPS origins.
+- Coach continues to use the deterministic offline Core when the Hub is unavailable or AI entitlement is off.
