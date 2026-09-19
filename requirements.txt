@@ -1,0 +1,2 @@
+# Phase 1 Termux baseline intentionally uses Python standard library only.
+# No pip packages required.
