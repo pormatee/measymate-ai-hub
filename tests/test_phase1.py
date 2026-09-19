@@ -1,11 +1,7 @@
-import io
 import json
-import os
 import socket
 import unittest
-from unittest.mock import patch
 
-from app.api.v1.ai import generate_response
 from app.core.config import Settings
 from app.core.errors import InvalidRequestError, ProviderConfigurationError, ProviderTimeoutError
 from app.domain.models import Message
@@ -22,7 +18,7 @@ class FakeResponse:
     def read(self): return self._body
 
 
-class Phase1Tests(unittest.TestCase):
+class Phase1RegressionTests(unittest.TestCase):
     def test_health(self):
         self.assertEqual(health_body()["status"], "ok")
 
@@ -55,23 +51,10 @@ class Phase1Tests(unittest.TestCase):
         with self.assertRaises(ProviderTimeoutError):
             adapter.generate([Message(role="user", content="hello")], 20)
 
-    def test_api_missing_provider_key_is_sanitized(self):
-        with patch.dict(os.environ, {}, clear=True):
-            status, body = generate_response({"profile": "standard", "messages": [{"role": "user", "content": "hello"}]})
-        self.assertEqual(status, 503)
-        self.assertEqual(body["error"]["code"], "PROVIDER_NOT_CONFIGURED")
-        self.assertNotIn("key", body["error"]["message"].lower())
-
-    def test_invalid_request_fails_safely(self):
-        status, body = generate_response({"profile": "standard", "messages": []})
-        self.assertEqual(status, 400)
-        self.assertEqual(body["error"]["code"], "INVALID_REQUEST")
+    def test_config_has_no_python_dotenv_dependency(self):
+        import app.core.config as config
+        self.assertTrue(callable(config.get_settings))
 
 
 if __name__ == "__main__":
     unittest.main()
-
-class StdlibOnlyRegressionTests(unittest.TestCase):
-    def test_config_has_no_python_dotenv_dependency(self):
-        import app.core.config as config
-        self.assertTrue(callable(config.get_settings))

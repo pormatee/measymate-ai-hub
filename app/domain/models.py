@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-
 _ALLOWED_ROLES = {"system", "user", "assistant"}
 
 
@@ -61,8 +60,4 @@ class Usage:
     total_tokens: int = 0
 
     def to_dict(self) -> dict:
-        return {
-            "input_tokens": self.input_tokens,
-            "output_tokens": self.output_tokens,
-            "total_tokens": self.total_tokens,
-        }
+        return {"input_tokens": self.input_tokens, "output_tokens": self.output_tokens, "total_tokens": self.total_tokens}

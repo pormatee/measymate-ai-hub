@@ -3,12 +3,7 @@ import socket
 import urllib.error
 import urllib.request
 
-from app.core.errors import (
-    ProviderConfigurationError,
-    ProviderRateLimitedError,
-    ProviderTimeoutError,
-    ProviderUnavailableError,
-)
+from app.core.errors import ProviderConfigurationError, ProviderRateLimitedError, ProviderTimeoutError, ProviderUnavailableError
 from app.domain.models import Message, Usage
 from app.providers.base import ProviderAdapter, ProviderResult
 
@@ -61,10 +56,6 @@ class DeepSeekAdapter(ProviderAdapter):
                 output_tokens=int(usage_raw.get("completion_tokens") or 0),
                 total_tokens=int(usage_raw.get("total_tokens") or 0),
             )
-            return ProviderResult(
-                text=choice["message"].get("content") or "",
-                usage=usage,
-                finish_reason=choice.get("finish_reason"),
-            )
+            return ProviderResult(text=choice["message"].get("content") or "", usage=usage, finish_reason=choice.get("finish_reason"))
         except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ProviderUnavailableError("AI provider returned an invalid response.") from exc

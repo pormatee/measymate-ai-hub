@@ -4,11 +4,6 @@ from pathlib import Path
 
 
 def load_local_env(path: str = ".env") -> None:
-    """Load simple KEY=VALUE pairs without third-party dependencies.
-
-    Existing environment variables always win. This is intentionally small and
-    only supports the .env syntax needed by MEasyMate AI Hub Phase 1.
-    """
     env_path = Path(path)
     if not env_path.is_file():
         return
@@ -36,6 +31,7 @@ class Settings:
     deepseek_base_url: str = field(default_factory=lambda: os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"))
     deepseek_model: str = field(default_factory=lambda: os.getenv("DEEPSEEK_MODEL", "deepseek-chat"))
     provider_timeout_seconds: float = field(default_factory=lambda: float(os.getenv("AI_HUB_PROVIDER_TIMEOUT_SECONDS", "30")))
+    clients_json: str = field(default_factory=lambda: os.getenv("AI_HUB_CLIENTS_JSON", "[]"))
 
 
 def get_settings() -> Settings:

@@ -13,6 +13,38 @@ class InvalidRequestError(HubError):
     http_status = 400
 
 
+class UnauthorizedError(HubError):
+    code = "UNAUTHORIZED"
+    http_status = 401
+
+
+class ClientDisabledError(HubError):
+    code = "CLIENT_DISABLED"
+    http_status = 403
+
+
+class IdentityMismatchError(HubError):
+    code = "IDENTITY_MISMATCH"
+    http_status = 403
+
+
+class RateLimitedError(HubError):
+    code = "RATE_LIMITED"
+    http_status = 429
+    retryable = True
+
+
+class QuotaExceededError(HubError):
+    code = "QUOTA_EXCEEDED"
+    http_status = 429
+    retryable = False
+
+
+class AuthenticationConfigurationError(HubError):
+    code = "AUTH_NOT_CONFIGURED"
+    http_status = 503
+
+
 class ProviderConfigurationError(HubError):
     code = "PROVIDER_NOT_CONFIGURED"
     http_status = 503
