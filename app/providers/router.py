@@ -3,13 +3,12 @@ from app.core.errors import InvalidRequestError
 from app.providers.base import ProviderAdapter
 from app.providers.deepseek import DeepSeekAdapter
 
-
 class ProviderRouter:
     def __init__(self, settings: Settings):
         self.settings = settings
 
     def for_profile(self, profile: str) -> ProviderAdapter:
-        if profile != "standard":
+        if profile not in {"standard", "coach-understanding"}:
             raise InvalidRequestError("Unsupported AI profile.")
         return DeepSeekAdapter(
             api_key=self.settings.deepseek_api_key,

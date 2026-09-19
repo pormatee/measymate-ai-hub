@@ -1,22 +1,24 @@
 import hashlib
 import json
 import unittest
+from datetime import datetime, timezone
 
 from app.api.v1.ai import generate_response
 from app.auth.registry import ClientRegistry
 from app.core.runtime import HubRuntime
 from app.domain.models import Usage
+from app.entitlements.registry import EntitlementRegistry, ProductRegistry
+from app.entitlements.service import EntitlementService
 from app.limits.guard import InMemoryUsageGuard
 from app.providers.base import ProviderResult
 
-
 TOKEN = "mmh_test_client_token_1234567890"
-
 
 def registry_json(*, enabled=True, rpm=10, daily=100):
     digest = hashlib.sha256(TOKEN.encode("utf-8")).hexdigest()
     return json.dumps([{
         "client_id": "client-a",
+        "license_id": "LIC-A",
         "product_id": "product-a",
         "token_sha256": digest,
         "enabled": enabled,
@@ -24,32 +26,36 @@ def registry_json(*, enabled=True, rpm=10, daily=100):
         "daily_request_quota": daily,
     }])
 
-
 class FakeAIService:
     def __init__(self):
         self.calls = 0
-
     def generate(self, request):
         self.calls += 1
         return ProviderResult(text="ok", usage=Usage(input_tokens=2, output_tokens=1, total_tokens=3), finish_reason="stop")
 
-
 def make_runtime(*, enabled=True, rpm=10, daily=100, clock=None):
     ai = FakeAIService()
+    products = ProductRegistry.from_json(json.dumps([{
+        "product_id":"product-a","ai_enabled":True,"ai_mode":"AUTO","allowed_profiles":["standard"]
+    }]))
+    entitlements = EntitlementRegistry.from_json(json.dumps([{
+        "license_id":"LIC-A","product_id":"product-a","plan":"DEV","ai_enabled":True,
+        "expires_at":"2099-01-01T00:00:00Z","monthly_token_quota":1000
+    }]))
+    service = EntitlementService(products, entitlements, now=lambda: datetime(2026,1,1,tzinfo=timezone.utc))
     runtime = HubRuntime(
         registry=ClientRegistry.from_json(registry_json(enabled=enabled, rpm=rpm, daily=daily)),
         usage_guard=InMemoryUsageGuard(clock=clock),
         ai_service=ai,
+        entitlement_service=service,
     )
     return runtime, ai
-
 
 def payload(extra=None):
     data = {"profile": "standard", "messages": [{"role": "user", "content": "hello"}]}
     if extra:
         data.update(extra)
     return data
-
 
 class Phase2Tests(unittest.TestCase):
     def test_missing_auth_is_401_before_provider(self):
@@ -88,6 +94,13 @@ class Phase2Tests(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "IDENTITY_MISMATCH")
         self.assertEqual(ai.calls, 0)
 
+    def test_license_spoof_is_denied_before_provider(self):
+        runtime, ai = make_runtime()
+        status, body = generate_response(runtime, payload({"license_id": "OTHER"}), f"Bearer {TOKEN}")
+        self.assertEqual(status, 403)
+        self.assertEqual(body["error"]["code"], "IDENTITY_MISMATCH")
+        self.assertEqual(ai.calls, 0)
+
     def test_rate_limit_blocks_before_provider(self):
         runtime, ai = make_runtime(rpm=1, daily=100, clock=lambda: 1000.0)
         first, _ = generate_response(runtime, payload(), f"Bearer {TOKEN}")
@@ -108,7 +121,14 @@ class Phase2Tests(unittest.TestCase):
 
     def test_empty_registry_fails_closed(self):
         ai = FakeAIService()
-        runtime = HubRuntime(registry=ClientRegistry.from_json("[]"), usage_guard=InMemoryUsageGuard(), ai_service=ai)
+        products = ProductRegistry.from_json("[]")
+        entitlements = EntitlementRegistry.from_json("[]")
+        runtime = HubRuntime(
+            registry=ClientRegistry.from_json("[]"),
+            usage_guard=InMemoryUsageGuard(),
+            ai_service=ai,
+            entitlement_service=EntitlementService(products, entitlements),
+        )
         status, body = generate_response(runtime, payload(), f"Bearer {TOKEN}")
         self.assertEqual(status, 503)
         self.assertEqual(body["error"]["code"], "AUTH_NOT_CONFIGURED")
@@ -125,7 +145,6 @@ class Phase2Tests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(body["error"]["code"], "INVALID_REQUEST")
         self.assertEqual(ai.calls, 0)
-
 
 if __name__ == "__main__":
     unittest.main()
