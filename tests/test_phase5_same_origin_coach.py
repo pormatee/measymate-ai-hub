@@ -17,13 +17,13 @@ class Phase5SameOriginCoachTests(unittest.TestCase):
         path = coach_html_path()
         self.assertTrue(path.is_file())
         data = coach_html_body()
-        self.assertIn(b"V2.0.3", data)
+        self.assertIn(b"V2.0.4", data)
         self.assertIn(b"SAME-ORIGIN", data)
 
     def test_coach_html_uses_same_origin_hub(self):
         text = coach_html_body().decode("utf-8")
         self.assertIn("location.origin", text)
-        self.assertIn("timeoutMs=15000", text)
+        self.assertIn("AI_UNDERSTAND_TIMEOUT_MS=20000", text)
         self.assertIn("AI Hub URL (", text)
 
     def test_coach_html_keeps_ai_guardrail(self):
