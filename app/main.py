@@ -1,6 +1,8 @@
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlsplit
 
 from app.api.v1.ai import generate_response, status_response
 from app.api.v1.coach import understand_response
@@ -9,15 +11,34 @@ from app.core.cors import allowed_cors_origin, parse_cors_origins
 from app.core.errors import HubError
 from app.core.runtime import HubRuntime
 
-VERSION = "0.4.0-termux"
+VERSION = "0.5.0-termux"
+DEFAULT_COACH_HTML_PATH = Path(__file__).resolve().parent / "static" / "coach" / "index.html"
 
 
 def health_body() -> dict:
-    return {"status": "ok", "service": "MEasyMate AI Hub", "version": VERSION, "phase": "coach-browser-bridge-v1"}
+    return {
+        "status": "ok",
+        "service": "MEasyMate AI Hub",
+        "version": VERSION,
+        "phase": "coach-same-origin-v1",
+    }
+
+
+def route_path(raw_path: str) -> str:
+    return urlsplit(raw_path or "/").path
+
+
+def coach_html_path() -> Path:
+    raw = os.getenv("AI_HUB_COACH_HTML_PATH", "").strip()
+    return Path(raw).expanduser() if raw else DEFAULT_COACH_HTML_PATH
+
+
+def coach_html_body() -> bytes:
+    return coach_html_path().read_bytes()
 
 
 class HubHandler(BaseHTTPRequestHandler):
-    server_version = "MEasyMateAIHub/0.4.0"
+    server_version = "MEasyMateAIHub/0.5.0"
 
     def _cors_origin(self):
         return allowed_cors_origin(self.headers.get("Origin"), self.server.cors_origins)
@@ -40,8 +61,26 @@ class HubHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _send_html(self, data: bytes):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _redirect(self, location: str):
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
     def do_OPTIONS(self):
-        if self.path not in {"/v1/ai/status", "/v1/ai/generate", "/v1/coach/understand"}:
+        path = route_path(self.path)
+        if path not in {"/v1/ai/status", "/v1/ai/generate", "/v1/coach/understand"}:
             self._send_json(404, {"status": "error", "error": {"code": "NOT_FOUND", "message": "Not found.", "retryable": False}})
             return
         if self.headers.get("Origin") and not self._cors_origin():
@@ -52,10 +91,26 @@ class HubHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == "/health":
+        path = route_path(self.path)
+
+        if path == "/health":
             self._send_json(200, health_body())
             return
-        if self.path == "/v1/ai/status":
+
+        if path == "/coach":
+            self._redirect("/coach/")
+            return
+
+        if path in {"/coach/", "/coach/index.html"}:
+            try:
+                data = coach_html_body()
+            except OSError:
+                self._send_json(503, {"status": "error", "error": {"code": "COACH_APP_NOT_FOUND", "message": "Coach app is not installed.", "retryable": False}})
+                return
+            self._send_html(data)
+            return
+
+        if path == "/v1/ai/status":
             status, body = status_response(
                 self.server.hub_runtime,
                 self.headers.get("Authorization"),
@@ -63,6 +118,7 @@ class HubHandler(BaseHTTPRequestHandler):
             )
             self._send_json(status, body)
             return
+
         self._send_json(404, {"status": "error", "error": {"code": "NOT_FOUND", "message": "Not found.", "retryable": False}})
 
     def _read_json(self):
@@ -72,7 +128,8 @@ class HubHandler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
     def do_POST(self):
-        if self.path not in {"/v1/ai/generate", "/v1/coach/understand"}:
+        path = route_path(self.path)
+        if path not in {"/v1/ai/generate", "/v1/coach/understand"}:
             self._send_json(404, {"status": "error", "error": {"code": "NOT_FOUND", "message": "Not found.", "retryable": False}})
             return
         try:
@@ -80,7 +137,7 @@ class HubHandler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
             self._send_json(400, {"status": "error", "error": {"code": "INVALID_REQUEST", "message": "Invalid request.", "retryable": False}})
             return
-        fn = understand_response if self.path == "/v1/coach/understand" else generate_response
+        fn = understand_response if path == "/v1/coach/understand" else generate_response
         status, body = fn(
             self.server.hub_runtime,
             payload,
@@ -106,6 +163,7 @@ def run():
     server.hub_runtime = runtime
     server.cors_origins = cors_origins
     print(f"MEasyMate AI Hub {VERSION} listening on http://{host}:{port}")
+    print(f"Coach UI: http://{host}:{port}/coach/")
     server.serve_forever()
 
 
