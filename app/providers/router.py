@@ -8,7 +8,7 @@ class ProviderRouter:
         self.settings = settings
 
     def for_profile(self, profile: str) -> ProviderAdapter:
-        if profile not in {"standard", "coach-understanding"}:
+        if profile not in {"standard", "coach-understanding", "cbi-semantic"}:
             raise InvalidRequestError("Unsupported AI profile.")
         return DeepSeekAdapter(
             api_key=self.settings.deepseek_api_key,
