@@ -1,4 +1,4 @@
-# MEasyMate AI Hub V1 — Phase 2 Termux Baseline
+# MEasyMate AI Hub V1 — Phase 2 CLOSED / PASS
 
 Provider-neutral AI Hub for Android + Termux.
 
@@ -45,3 +45,18 @@ curl -s -X POST http://127.0.0.1:8000/v1/ai/generate \
   -H "Content-Type: application/json" \
   -d '{"profile":"standard","messages":[{"role":"user","content":"ตอบสั้นๆว่า Phase 2 auth สำเร็จ"}],"options":{"max_output_tokens":100}}'
 ```
+
+
+<!-- PHASE2_CLOSE_2026_09_20 -->
+## Phase 2 close checkpoint
+
+- Stable version: `0.2.0-termux`
+- Authentication / authenticated client+product identity: PASS
+- Identity spoof protection: PASS
+- Per-client rate limit: PASS
+- Per-client daily request quota: PASS
+- Provider call blocked before auth/rate/quota failures: PASS
+- Multi-project isolation gate: PASS
+- Client registry stores SHA-256 token hash, not raw client token
+- Known limitation: rate/quota state is in-memory and resets on restart; persistence remains production hardening work.
+- Later Coach/entitlement work remains on its separate branch and is not part of this stable Phase 2 close.

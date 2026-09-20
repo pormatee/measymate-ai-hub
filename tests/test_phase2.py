@@ -129,3 +129,59 @@ class Phase2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# PHASE2_MULTI_PROJECT_ISOLATION_GATE
+TOKEN_B = "mmh_test_client_token_B_1234567890"
+
+def multi_registry_json():
+    return json.dumps([
+        {
+            "client_id": "client-a",
+            "product_id": "product-a",
+            "token_sha256": hashlib.sha256(TOKEN.encode("utf-8")).hexdigest(),
+            "enabled": True,
+            "requests_per_minute": 10,
+            "daily_request_quota": 1,
+        },
+        {
+            "client_id": "client-b",
+            "product_id": "product-b",
+            "token_sha256": hashlib.sha256(TOKEN_B.encode("utf-8")).hexdigest(),
+            "enabled": True,
+            "requests_per_minute": 10,
+            "daily_request_quota": 1,
+        },
+    ])
+
+class Phase2MultiProjectIsolationTests(unittest.TestCase):
+    def make_multi_runtime(self):
+        ai = FakeAIService()
+        runtime = HubRuntime(
+            registry=ClientRegistry.from_json(multi_registry_json()),
+            usage_guard=InMemoryUsageGuard(clock=lambda: 1000.0),
+            ai_service=ai,
+        )
+        return runtime, ai
+
+    def test_product_a_cannot_spoof_product_b(self):
+        runtime, ai = self.make_multi_runtime()
+        status, body = generate_response(
+            runtime,
+            payload({"product_id": "product-b"}),
+            f"Bearer {TOKEN}",
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(body["error"]["code"], "IDENTITY_MISMATCH")
+        self.assertEqual(ai.calls, 0)
+
+    def test_product_clients_have_isolated_daily_quota(self):
+        runtime, ai = self.make_multi_runtime()
+        a1, _ = generate_response(runtime, payload(), f"Bearer {TOKEN}")
+        a2, body_a2 = generate_response(runtime, payload(), f"Bearer {TOKEN}")
+        b1, _ = generate_response(runtime, payload(), f"Bearer {TOKEN_B}")
+        self.assertEqual(a1, 200)
+        self.assertEqual(a2, 429)
+        self.assertEqual(body_a2["error"]["code"], "QUOTA_EXCEEDED")
+        self.assertEqual(b1, 200)
+        self.assertEqual(ai.calls, 2)

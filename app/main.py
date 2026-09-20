@@ -11,7 +11,7 @@ VERSION = "0.2.0-termux"
 
 
 def health_body() -> dict:
-    return {"status": "ok", "service": "MEasyMate AI Hub", "version": VERSION, "phase": "phase-2-in-progress"}
+    return {"status": "ok", "service": "MEasyMate AI Hub", "version": VERSION, "phase": "phase-2-closed"}
 
 
 class HubHandler(BaseHTTPRequestHandler):
